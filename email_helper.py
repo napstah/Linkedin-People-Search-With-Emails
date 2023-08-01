@@ -14,6 +14,7 @@ STARTING_PAGE = 1
 people = []
 keywords = input("Keywords: ").replace("&", '%26').replace(' ', '%20').replace('/','%2F')
 
+
 user = os.environ.get('USERNAME')
 
 def get_driver():
@@ -180,12 +181,13 @@ def num_of_pages(num_of_people):
         return 0
 
 
-def extract(transformed_url, page, driver, keywords):
+def extract(transformed_url, page, driver):
     if transformed_url:
         #'&keywords="Demand%20Generation"'
         #'&keywords="Demand%20Generation"%20OR%20"Account-based%20Marketing"%20OR%20ABM%20Marketing%20OR%20"Competitive%20intelligence"%20OR%20"Competitive%20Market"'
         # keywords = '&keywords="Finance"%20OR%20"IT"'
-        profile_url = f'{transformed_url}{keywords}&page={page}'
+        search_keywords = f'&keywords={keywords}'
+        profile_url = f'{transformed_url}{search_keywords}&page={page}'
         driver.get(profile_url)
         sleep(3)
         src = driver.page_source
@@ -194,15 +196,22 @@ def extract(transformed_url, page, driver, keywords):
     
 
 def transform(soup, company_name, page, posible_email_format, company_url):
-    if page == 1:
-        try:
-            ul = soup.find_all('ul', class_='reusable-search__entity-result-list list-style-none')[1]
-            lis = ul.find_all('li')
-        except:
-            lis = ''
-    elif page > 1:
+    num_of_uls = len(soup.find_all('ul', class_='reusable-search__entity-result-list list-style-none'))
+    if num_of_uls > 2:
+        ul = soup.find_all('ul', class_='reusable-search__entity-result-list list-style-none')[1]
+        lis = ul.find_all('li')
+    elif num_of_uls <= 2:
         ul = soup.find_all('ul', class_='reusable-search__entity-result-list list-style-none')[0]
         lis = ul.find_all('li')
+    # if page == 1:
+    #     try:
+    #         ul = soup.find_all('ul', class_='reusable-search__entity-result-list list-style-none')[1]
+    #         lis = ul.find_all('li')
+    #     except:
+    #         lis = ''
+    # elif page > 1:
+    #     ul = soup.find_all('ul', class_='reusable-search__entity-result-list list-style-none')[0]
+    #     lis = ul.find_all('li')
     if lis != '':
         for li in lis:
             try:
@@ -262,7 +271,7 @@ def read_csv(filename):
     return companies
 
 
-def scrape(driver, keywords):
+def scrape(driver):
     
     companies = read_csv(filename='companies.csv')
     for company in companies:
@@ -279,7 +288,7 @@ def scrape(driver, keywords):
         transformed_url = full_linkedin_url(soup_content)
         company_name = get_company_name(soup_content)
         sleep(2)
-        content = extract(transformed_url, STARTING_PAGE, driver, keywords)
+        content = extract(transformed_url, STARTING_PAGE, driver)
         num_of_people = get_num_of_people(content)
         if num_of_people >= 1000:
             pages = 100
@@ -304,7 +313,7 @@ def scrape(driver, keywords):
                 if i <= 100:
                     sleep(sleep_time)
                     print(f"Getting Page {i} of {pages}", end='\r')
-                    cont = extract(transformed_url, i, driver, keywords)
+                    cont = extract(transformed_url, i, driver)
                     transform(cont, company_name, i, posible_email_format, company_url)
                 else:
                     cmpny = company.replace('/', '')
@@ -324,7 +333,7 @@ def scrape(driver, keywords):
 
 def main():
     driver = get_driver()
-    scrape(driver, keywords)
+    scrape(driver)
 
 if __name__ == '__main__':
     main()
