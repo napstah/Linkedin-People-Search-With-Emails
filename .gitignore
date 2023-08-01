@@ -1,0 +1,8 @@
+/.mypy_cache
+/.vscode
+/companies_list.py
+/contacts_Aveva.csv
+/contacts_http
+/contacts_Odoo.csv
+/contacts_WKS Restaurant Group.csv
+/__pycache__
