@@ -1,6 +1,9 @@
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from bs4 import BeautifulSoup
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
 import random
 from time import sleep
 import math
@@ -9,18 +12,35 @@ import csv
 import urllib.parse
 import os
 
+print("""
+    Usage:
+        1. Create a CSV file named "companies" and include the company name and URL.
+            Example format: company name, company URL
+            Example entry: WKS Restaurant Group, https://www.wksusa.com/
+                           Apple Inc., https://www.apple.com/
+        2. Close all instances of the Google Chrome before proceeding.
+        3. Enter the relevant keywords when prompted. Suitable examples include:
+            "Finance" OR "IT"
+            "HR Manager"
+            "CIO" AND "CISO"
+    Note:
+        Please be aware that the email format found on Google may not always be accurate or up-to-date. It is essential to verify the email addresses again to ensure their correctness.
+        This includes checking for the presence of special characters in names (such as e, è, é, ê, ë).
+""")
 
 STARTING_PAGE = 1
 people = []
 keywords = input("Keywords: ").replace("&", '%26').replace(' ', '%20').replace('/','%2F')
-
-
 user = os.environ.get('USERNAME')
+
+
 
 def get_driver():
     options = Options()
     options.add_argument(f"user-data-dir=C:\\Users\\{user}\\AppData\\Local\\Google\\Chrome\\User Data")
     options.add_argument("--log-level=3")
+    options.add_argument("--headless")
+    options.add_argument("--disable-gpu")
     driver = webdriver.Chrome(options=options)
     return driver
 
@@ -32,18 +52,18 @@ def get_format_url(driver, company_name, company_url):
     src = driver.page_source
     soup = BeautifulSoup(src, 'html.parser')
     email_format_url = soup.find('div', class_='kvH3mc BToiNc UK95Uc').find('div', class_='yuRUbf').find('a').get('href')
-    print(email_format_url)
+    print("Searching for email format", end='\r')
     return email_format_url
 
 
 def get_format_from_url(driver, email_format_url):
     url = email_format_url
     driver.get(url)
-    sleep(10)
+    WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, "percentage")))
     src = driver.page_source
     soup = BeautifulSoup(src, 'html.parser')
     posible_email_format = soup.find('div', class_='headline-summary').find('div', class_='table-wpr').find('table', class_='table').find('tbody').find('tr').find('td').text.strip()
-    print(posible_email_format)
+    print(f'Found posible email format{posible_email_format}', end='\r')
     return posible_email_format
 
 
@@ -229,6 +249,14 @@ def transform(soup, company_name, page, posible_email_format, company_url):
                 title = li.find('div', class_='entity-result__primary-subtitle').text.strip()
             except:
                 title = ''
+            try:
+                location = li.find('div', class_='entity-result__secondary-subtitle').text.strip()
+            except:
+                location = ''
+            try:
+                past_current_skils = li.find('p', class_='entity-result__summary').text.strip()
+            except:
+                past_current_skils = 'N/A'
             if first_name == 'Linkedin':
                 matched_email = 'NA'
             else:
@@ -238,7 +266,9 @@ def transform(soup, company_name, page, posible_email_format, company_url):
                 'First Name': first_name,
                 'Last Name': last_name,
                 'Title': title,
+                'Current/Past/Summary/Skills': past_current_skils,
                 'Company': company_name,
+                'Location': location,
                 'Posible email': matched_email,
             }
             people.append(person)
@@ -272,22 +302,17 @@ def read_csv(filename):
 
 
 def scrape(driver):
-    
     companies = read_csv(filename='companies.csv')
     for company in companies:
         company_name = company[0]
-        print(company_name)
         company_url = company[1].replace('https:', '').replace('www.', '').replace('/', '')
-        print(company_url)
         email_format_url = get_format_url(driver, company_name, company_url)
         posible_email_format = get_format_from_url(driver, email_format_url)
         linkedin_url = get_linkedin_url(company_name, driver)
         checked_url = check_and_transform_linkedin_url(linkedin_url)
-        sleep(2)
         soup_content = transform_url(checked_url, driver)
         transformed_url = full_linkedin_url(soup_content)
-        company_name = get_company_name(soup_content)
-        sleep(2)
+        #company_name = get_company_name(soup_content)
         content = extract(transformed_url, STARTING_PAGE, driver)
         num_of_people = get_num_of_people(content)
         if num_of_people >= 1000:
